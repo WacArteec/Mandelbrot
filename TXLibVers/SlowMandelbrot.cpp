@@ -1,7 +1,6 @@
-#include <TXLib.h>
-// #include <math.h>
+#include <TXLib.hpp>
+#include <math.h>
 #include <Windows.h>
-#include <immintrin.h>
 
 #define WIDTH 800
 #define HEIGHT 600
@@ -25,36 +24,25 @@ int CompareFloats(double num1, double num2)
     return ret;
 }
 
-__m256i Mandelbrot_AVX(__m256d creal, __m256d cimage)
+int Mandelbrot(double creal, double cimage)
 {
-    __m256d zreal = _mm256_setzero_pd();  // double zreal = 0.0, zimage = 0.0;
-    __m256d zimage = _mm256_setzero_pd(); //
-    __m256i iter = _mm256_setzero_si256();
+    double zreal = 0.0, zimage = 0.0;
+    int iter = 0;
 
-    __m256d arr_of_ten = _mm256_set1_pd(10.0);
-    __m256d arr_of_one = _mm256_set1_epi64x(1);
-    __m256d arr_of_two = _mm256_set1_pd(2.0);
-
-    for (int iter = 0; iter < MAX_ITER; iter++)
+    while (iter < MAX_ITER)
     {
-        __m256d zr2 = _mm256_mul_pd(zreal, zreal);   // double zr2 = zreal * zreal;
-        __m256d zi2 = _mm256_mul_pd(zimage, zimage); // double zi2 = zimage * zimage;
+        double zr2 = zreal * zreal;
+        double zi2 = zimage * zimage;
 
-        __m256d mask = _mm256_cmp_pd(_mm256_add_pd(zr2, zi2),
-                                     arr_of_ten,
-                                     _CMP_LE_OQ); // if (zr2 + zi2 <= 10.0) _CMP_LE_OQ - это <=
-
-        __m256i add_iters = _mm256_and_si256(_mm256_castpd_si256(mask), arr_of_one); // у всех точек, что не выбыли, добавляем единицу к количеству циклов
-        iter = _mm256_add_epi64(iter, add_iters);                                    //
-
-        if (_mm256_testz_pd(mask) == 1) // возвращаетя 1, если все нули
+        if (zr2 + zi2 > 10.0)
             break;
 
-        __m256d new_zr = _mm256_add_pd(_mm256_sub_pd(zr2, zi2) + creal);                            // double new_zr = zr2 - zi2 + creal;
-        __m256d new_zi = _mm256_add_pd(_mm256_mul_pd(arr_of_two, _mm256_mul_pd(zr2, zi2)) + creal); // double new_zi = 2 * zreal * zimage + cimage;
+        double new_zr = zr2 - zi2 + creal;
+        double new_zi = 2 * zreal * zimage + cimage;
 
-        zreal = _mm256_blendv_pd(zreal, new_zr, mask);   // zreal = new_zr;
-        zimage = _mm256_blendv_pd(zimage, new_zi, mask); // zimage = new_zi;
+        zreal = new_zr;
+        zimage = new_zi;
+        iter++;
     }
 
     return iter;
@@ -66,36 +54,22 @@ void DrawMandelbrot(Coords *coords)
 
     for (int y = 0; y < HEIGHT; y++)
     {
-        for (int x = 0; x < WIDTH; x += 4)
+        for (int x = 0; x < WIDTH; x++)
         {
-            double real[4] = {0};
-            double imag[4] = {0};
+            double real = coords->minX + (coords->maxX - coords->minX) * x / WIDTH;
+            double imag = coords->minY + (coords->maxY - coords->minY) * y / HEIGHT;
 
-            for (size_t i = 0; i < 4; i++)
-            {
-                real[i] = coords->minX + (coords->maxX - coords->minX) * (x + i) / WIDTH;
-                imag[i] = coords->minY + (coords->maxY - coords->minY) * y / HEIGHT;
-            }
+            int iter = Mandelbrot(real, imag);
 
-            __m256d real_fast = _mm256_loadu_pd(real);
-            __m256d image_fast = _mm256_loadu_pd(imag);
+            COLORREF color = (iter == MAX_ITER) ? TX_BLACK : RGB((iter * 1) % 255, (iter * 3) % 255, (iter * 2) % 255);
 
-            __m256i iterations = Mandelbrot(real_fast, image_fast);
-
-            int iter[4] = {0};
-
-            for (size_t i = 0; i < 4; i++)
-            {
-                COLORREF color = (iter[i] == MAX_ITER) ? TX_BLACK : RGB((iter * 1) % 255, (iter * 3) % 255, (iter * 2) % 255);
-
-                txSetPixel(x, y, color);
-            }
+            txSetPixel(x, y, color);
         }
     }
 
     DWORD currentTime = GetTickCount();
 
-    float fps = 1000 / (currentTime - lastTime);
+    float fps = 1.0 / (currentTime - lastTime);
 
     char buffer[32];
     sprintf(buffer, "FPS: %g", fps);
@@ -177,16 +151,17 @@ int main()
         if (CompareFloats(coords.maxX, old_coords.maxX) ||
             CompareFloats(coords.maxY, old_coords.maxY) ||
             CompareFloats(coords.minX, old_coords.minX) ||
-            CompareFloats(coords.minY, old_coords.minY))
-        {
-            DrawMandelbrot(&coords);
-            txSleep();
+            CompareFloats(coords.minY, old_coords.minY) )
+            {
+                DrawMandelbrot(&coords);
+                txSleep();
 
-            old_coords.maxX = coords.maxX;
-            old_coords.maxY = coords.maxY;
-            old_coords.minX = coords.minX;
-            old_coords.minY = coords.minY;
-        }
+                old_coords.maxX = coords.maxX;
+                old_coords.maxY = coords.maxY;
+                old_coords.minX = coords.minX;
+                old_coords.minY = coords.minY;
+
+            }
     }
 
     return 0;

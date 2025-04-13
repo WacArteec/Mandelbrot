@@ -1,15 +1,25 @@
 CC = g++
+CFLAGS = -std=c++11 -Wall -Wextra -O2 -fopenmp -march=native -mavx -mavx2 -ffast-math
+LIBS = -lsfml-graphics -lsfml-window -lsfml-system
+TARGET = mandelbrot
 
-FLAGS = -c -O3 -fopenmp -march=native -mavx -mavx2 -O3
+OBJECTS = main.o Array/Array.o AVX/AVX.o Graphics/Graphics.o Naive/Naive.o
 
-all: hello
-		Mandelbrot
+all: build
+	./$(TARGET)
 
-hello: main.o
-	$(CC) main.o -o Mandelbrot
+build: $(TARGET)
 
-main.o: main.cpp
-	$(CC) $(FLAGS) main.cpp -o main.o
+$(TARGET): $(OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
+
+%.o: %.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+run: $(TARGET)
+	./$(TARGET)
 
 clean:
-	rm -f *.o *.exe *.exe.log *.exe.log.dot
+	rm -f $(TARGET) $(OBJECTS)
+
+.PHONY: all clean build run

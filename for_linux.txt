@@ -1,2 +1,0 @@
-https://www.sfml-dev.org/tutorials/2.6/start-linux.php
-Model name:             AMD Ryzen 7 3700U with Radeon Vega Mobile Gfx

@@ -1,11 +1,10 @@
-#include "Naive.h"
+#include "../include/Naive.h"
 
-int MandelbrotNaive(double creal, double cimage)
+void Naivemandelbrot(double creal, double cimage, int *iter)
 {
     double zreal = 0.0, zimage = 0.0;
-    int iter = 0;
 
-    while (iter < MAX_ITER)
+    while (*iter < MAX_ITER)
     {
         double zr2 = zreal * zreal;
         double zi2 = zimage * zimage;
@@ -18,15 +17,6 @@ int MandelbrotNaive(double creal, double cimage)
 
         zreal = new_zr;
         zimage = new_zi;
-        iter++;
+        (*iter)++;
     }
-
-    return iter;
-}
-
-void Naive(double *real, double *imag, int* iters)
-{
-    for (int i = 0; i < 4; i++)
-        iters[i] = MandelbrotNaive(real[i], imag[i]);
-
 }

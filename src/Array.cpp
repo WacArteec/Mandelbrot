@@ -1,6 +1,6 @@
-#include "Array.h"
+#include "../include/Array.h"
 
-void Array(double *creal, double *cimag, int *iters)
+void ArrayMandelbrot(double *creal, double *cimag, int *iters)
 {
     double zreal[4] = {0.0, 0.0, 0.0, 0.0};
     double zimag[4] = {0.0, 0.0, 0.0, 0.0};

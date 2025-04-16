@@ -1,9 +1,10 @@
-#include "AVX.h"
+#include "../include/AVX.h"
+#include <stdio.h>
 
-void AVX(double *real, double *imag, int* iters)
+void AVXMandelbrot(double *real, double *imag, int* iters)
 {
-    __m256d creal = _mm256_loadu_pd(real);
-    __m256d cimage = _mm256_loadu_pd(imag);
+    __m256d creal = _mm256_load_pd(real);
+    __m256d cimage = _mm256_load_pd(imag);
 
     __m256d zreal = _mm256_setzero_pd();  // double zreal = 0.0, zimage = 0.0;
     __m256d zimage = _mm256_setzero_pd(); //
@@ -22,7 +23,7 @@ void AVX(double *real, double *imag, int* iters)
                                      arr_of_ten,
                                      _CMP_LE_OQ); // if (zr2 + zi2 <= 10.0) _CMP_LE_OQ - это <=
 
-        __m256i add_iters = _mm256_and_si256(_mm256_castpd_si256(mask), arr_of_one); // у всех точек, что не выбыли, добавляем единицу к количеству циклов
+        __m256i add_iters = _mm256_castpd_si256(_mm256_and_pd(mask, _mm256_castsi256_pd(arr_of_one))); // у всех точек, что не выбыли, добавляем единицу к количеству циклов
         iter = _mm256_add_epi64(iter, add_iters);                                    //
 
         if (_mm256_testz_pd(mask, mask) == 1) // возвращаетя 1, если все нули

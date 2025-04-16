@@ -3,4 +3,5 @@
 *exe.log.dmp
 *.o
 /.vscode/
+/obj/
 mandelbrot

@@ -2,11 +2,13 @@
 #define GRAPHICS_H
 
 #include <chrono>
-#include <SFML/Graphics.hpp>
 #include <string.h>
 
-#include "../enum.h"
+#include "enum.h"
+#include "Naive.h"
+#include "Array.h"
+#include "AVX.h"
 
-void DrawMandelbrot(Counters *counters);
+void DrawMandelbrot();
 
 #endif //GRAPHICS_H

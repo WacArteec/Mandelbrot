@@ -1,4 +1,6 @@
-#include "Graphics.h"
+#include <SFML/Graphics.hpp>
+
+#include "../include/Graphics.h"
 
 struct Coords
 {
@@ -15,13 +17,10 @@ struct Graphic
     sf::Image &image;
     sf::Texture &texture;
     sf::Sprite &sprite;
-
-    Graphic(Coords *coords_, sf::RenderWindow &window_, sf::Image &image_, sf::Texture &texture_, sf::Sprite &sprite_)
-        : coords(coords_), window(window_), image(image_), texture(texture_), sprite(sprite_) {}
 };
 
-int MandelbrotBase(double creal, double cimage);
-void DrawMandelbrot(Graphic *graphic, void (*Mandelbrot)(double *, double *, int *));
+typedef void (*FrameCounter)(Graphic *);
+
 sf::Color GetColor(int iter);
 
 sf::Color GetColor(int iter)
@@ -36,19 +35,39 @@ sf::Color GetColor(int iter)
     return sf::Color(r, g, b);
 }
 
-double DrawFrame(Graphic *graphic, void (*Mandelbrot)(double *, double *, int *))
+void NaiveCountFrame(Graphic *graphic)
 {
-    auto start = std::chrono::high_resolution_clock::now();
+    for (int y = 0; y < HEIGHT; y++)
+    {
+        for (int x = 0; x < WIDTH; x ++)
+        {
+            double real;
 
+            double imag;
+
+            int iters;
+
+                real = graphic->coords->minX + (graphic->coords->maxX - graphic->coords->minX) * x / WIDTH;
+                imag = graphic->coords->minY + (graphic->coords->maxY - graphic->coords->minY) * y / HEIGHT;
+
+            NaiveMandelbrot(real, imag, &iters);
+
+            graphic->image.setPixel(x, y, GetColor(iters));
+        }
+    }
+}
+
+void ArrayCountFrame(Graphic *graphic)
+{
     for (int y = 0; y < HEIGHT; y++)
     {
         for (int x = 0; x < WIDTH; x += 4)
         {
-            double real[4] = {0};
+            double real[4];
 
-            double imag[4] = {0};
+            double imag[4];
 
-            int iters[4] __attribute__((aligned(32)));
+            int iters[4];
 
             for (size_t i = 0; i < 4; i++)
             {
@@ -56,12 +75,48 @@ double DrawFrame(Graphic *graphic, void (*Mandelbrot)(double *, double *, int *)
                 imag[i] = graphic->coords->minY + (graphic->coords->maxY - graphic->coords->minY) * y / HEIGHT;
             }
 
-            Mandelbrot(real, imag, iters);
+            ArrayMandelbrot(real, imag, iters);
 
             for (int i = 0; i < 4; i++)
                 graphic->image.setPixel(x + i, y, GetColor(iters[i]));
         }
     }
+}
+
+void AVXCountFrame(Graphic *graphic)
+{
+    for (int y = 0; y < HEIGHT; y++)
+    {
+        for (int x = 0; x < WIDTH; x += 4)
+        {
+            alignas(32) double real[4];
+
+            alignas(32) double imag[4];
+
+            alignas(32) int iters[4];
+
+            for (size_t i = 0; i < 4; i++)
+            {
+                real[i] = graphic->coords->minX + (graphic->coords->maxX - graphic->coords->minX) * (x + i) / WIDTH;
+                imag[i] = graphic->coords->minY + (graphic->coords->maxY - graphic->coords->minY) * y / HEIGHT;
+            }
+
+            AVXMandelbrot(real, imag, iters);
+
+            for (int i = 0; i < 4; i++)
+            {
+                //printf("%g %g %d\n", real[i], imag[i], iters[i]);
+                graphic->image.setPixel(x + i, y, GetColor(iters[i]));
+            }
+        }
+    }
+}
+
+double DrawFrame(Graphic *graphic, void (*FrameCounter)(Graphic *))
+{
+    auto start = std::chrono::high_resolution_clock::now();
+
+    FrameCounter(graphic);
 
     graphic->texture.loadFromImage(graphic->image);
     graphic->sprite.setTexture(graphic->texture);
@@ -93,9 +148,11 @@ double DrawFrame(Graphic *graphic, void (*Mandelbrot)(double *, double *, int *)
     return elapsed.count();
 }
 
-void DrawMandelbrot(Counters *counters)
+void DrawMandelbrot()
 {
     unsigned index = 0;
+
+    FrameCounter counters[3] = {AVXCountFrame, NaiveCountFrame, ArrayCountFrame};
 
     sf::RenderWindow window(sf::VideoMode(WIDTH, HEIGHT), "Mandelbrot");
     window.setFramerateLimit(60);
@@ -138,10 +195,10 @@ void DrawMandelbrot(Counters *counters)
 
         bool redraw = false;
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
+        if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape)
             window.close();
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
+        if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Right)
         {
             coords.minX -= moveStep;
             coords.maxX -= moveStep;
@@ -149,7 +206,7 @@ void DrawMandelbrot(Counters *counters)
             redraw = true;
         }
 
-        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
+        else if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Left)
         {
             coords.minX += moveStep;
             coords.maxX += moveStep;
@@ -157,7 +214,7 @@ void DrawMandelbrot(Counters *counters)
             redraw = true;
         }
 
-        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
+        else if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Up)
         {
             coords.minY += moveStep;
             coords.maxY += moveStep;
@@ -165,7 +222,7 @@ void DrawMandelbrot(Counters *counters)
             redraw = true;
         }
 
-        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
+        else if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Down)
         {
             coords.minY -= moveStep;
             coords.maxY -= moveStep;
@@ -173,14 +230,14 @@ void DrawMandelbrot(Counters *counters)
             redraw = true;
         }
 
-        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
+        else if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::A)
         {
             moveStep *= 1.1;
 
             redraw = true;
         }
 
-        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Z))
+        else if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Z)
         {
             moveStep *= 0.9;
 
@@ -194,7 +251,7 @@ void DrawMandelbrot(Counters *counters)
             redraw = true;
         }
 
-        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::O))
+        else if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::O)
         {
             double centerX = (coords.minX + coords.maxX) / 2;
             double centerY = (coords.minY + coords.maxY) / 2;
@@ -206,10 +263,12 @@ void DrawMandelbrot(Counters *counters)
             coords.minY = centerY - newHeight / 2;
             coords.maxY = centerY + newHeight / 2;
 
+            moveStep /= zoomFactor;
+
             redraw = true;
         }
 
-        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::P))
+        else if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::P)
         {
             double centerX = (coords.minX + coords.maxX) / 2;
             double centerY = (coords.minY + coords.maxY) / 2;
@@ -221,17 +280,19 @@ void DrawMandelbrot(Counters *counters)
             coords.minY = centerY - newHeight / 2;
             coords.maxY = centerY + newHeight / 2;
 
+            moveStep *= zoomFactor;
+
             redraw = true;
         }
 
-        if (redraw | !redraw) // заменить на if(redraw) после тестов и показа ментору
+        if (redraw /*| !redraw*/) // заменить на if(redraw) после тестов и показа ментору
         {
             time += DrawFrame(&graphic, counters[index]);
             old_coords = coords;
 
             draws++;
 
-            if (draws % 1000 == 0)
+            /*if (draws % 1000 == 0)
             {
                 printf("%s average time: %g\n", funcs[index], time / 1000);
                 time = 0.0;
@@ -240,7 +301,7 @@ void DrawMandelbrot(Counters *counters)
 
                 if (draws == 3000)
                     return;
-            }
+            }*/
         }
     }
 }
